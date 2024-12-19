@@ -1,0 +1,131 @@
+name: CMake Build
+
+on: 
+  push:
+    paths-ignore:
+        - '.gitignore'
+        - 'LICENSE'
+        - 'README*'
+  pull_request:
+    paths-ignore:
+        - '.gitignore'
+        - 'LICENSE'
+        - 'README*'
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: 10.15
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, macos-13, windows-2019]
+        qt_ver: ['5.15.2']
+        build_type: ["Debug", "Release", "MinSizeRel", "RelWithDebInfo"]
+        build_arch: ["x86_64"]
+        msbuild_arch: ["x64"]
+        artifact_arch: ["x64"]
+        include:
+          - os: ubuntu-latest
+            qt_ver: '6.8.1'
+            build_type: Release
+            artifact_arch: "x64"
+          - os: macos-13
+            qt_ver: '6.8.1'
+            build_arch: "x86_64"
+            build_type: Release
+            artifact_arch: "x64"
+          - os: macos-13
+            qt_ver: '6.8.1'
+            build_arch: arm64
+            build_type: Release
+            artifact_arch: arm64
+          - os: windows-2019
+            qt_ver: '5.15.2'
+            qt_arch: 'win32_msvc2019'
+            msbuild_arch: "x86"
+            build_type: Release
+            artifact_arch: x86
+          - os: windows-2022
+            qt_ver: '6.8.1'
+            qt_arch: 'win64_msvc2022_64'
+            msbuild_arch: "x64"
+            build_type: Release
+            artifact_arch: "x64"
+          - os: windows-2022
+            qt_ver: '6.8.1'
+            qt_arch: 'win64_msvc2022_arm64_cross_compiled'
+            msbuild_arch: "arm64"
+            build_type: Release
+            artifact_arch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with: 
+          fetch-depth: 1
+          
+      - uses: ./.github/actions/install-dependencies
+        with:
+          os_name: ${{ matrix.os }}
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt_ver }}
+          arch: ${{ matrix.qt_arch }}
+          cache: true
+
+      - name: Set QT_HOST_PATH for Windows arm64
+        if: matrix.msbuild_arch == 'arm64'
+        shell: pwsh
+        run: |
+          $env:QT_HOST_PATH = [System.IO.Path]::GetFullPath("$env:QT_ROOT_DIR\..\$((Split-Path -Path $env:QT_ROOT_DIR -Leaf) -replace '_arm64', '_64')")
+          echo "QT_HOST_PATH=$env:QT_HOST_PATH" >> $env:GITHUB_ENV
+          
+      - name: Configure and build windows
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+          .\scripts\windows\setVsDev.ps1 -Arch ${{ matrix.msbuild_arch }}
+          cmake `
+            -S . `
+            -B ./build `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -G "Ninja"
+          cmake --build ./build --config ${{ matrix.build_type }}
+      - name: Configure and build on macos
+        if: startsWith(matrix.os, 'macos')
+        shell: bash
+        run: |
+          cmake \
+            -S . \
+            -B ./build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.build_arch }} \
+            -G "Ninja"
+          cmake --build ./build --config ${{ matrix.build_type }}
+      - name: Configure and build on ubuntu
+        if: startsWith(matrix.os, 'ubuntu')
+        shell: bash
+        run: |
+          cmake \
+            -S . \
+            -B ./build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -G "Ninja"
+          cmake --build ./build --config ${{ matrix.build_type }}
+
+      - name: Show files
+        shell: bash
+        run: |
+          ls -al build/plugins/imageformats
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.qt_ver }}-${{ matrix.artifact_arch }}-${{ matrix.build_type }}
+          path: ./build/plugins
+          

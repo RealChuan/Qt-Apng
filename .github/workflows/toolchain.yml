@@ -1,0 +1,33 @@
+name: Build toolchain
+
+on: 
+  # 清理 Cache 后触发
+  workflow_run: 
+    workflows: [Cleanup caches by a branch]
+    types: completed
+  # 手动触发
+  workflow_dispatch:
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: 12.0
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with: 
+          fetch-depth: 1
+
+      - uses: ./.github/actions/install-dependencies
+        with:
+          os_name: ${{ matrix.os }}
