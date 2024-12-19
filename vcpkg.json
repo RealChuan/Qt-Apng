@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "qt-apng",
+  "version": "0.0.1",
+  "description": "manifest",
+  "dependencies": [
+    "zlib",
+    {
+      "name": "libpng",
+      "features": [
+        "apng"
+      ]
+    }
+  ],
+  "builtin-baseline": "b545373a9a536dc559dac8583467a21497a0e897"
+}
