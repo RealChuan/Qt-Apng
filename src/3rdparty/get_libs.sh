@@ -1,8 +1,8 @@
 #!/bin/bash
-set -e
+set -xe
 
-ZLIB_VERSION="1.2.11"
-LIBPNG_VERSION="1.6.40"
+ZLIB_VERSION="1.3.1"
+LIBPNG_VERSION="1.6.46"
 
 cd $(dirname $0)
 rm -rf zlib/src libpng/src
@@ -22,8 +22,9 @@ mv libpng-${LIBPNG_VERSION} libpng/src
 # get and apply apng patch
 curl -Lo libpng-apng.patch.gz "https://download.sourceforge.net/project/apng/libpng/libpng16/libpng-${LIBPNG_VERSION}-apng.patch.gz"
 gunzip libpng-apng.patch.gz
+tr -d '\r' < libpng-apng.patch > tmpfile && mv tmpfile libpng-apng.patch
 pushd libpng/src
-patch -N -i "../../fix-symbols.patch" "../../libpng-apng.patch"
+# patch -N -i "../../fix-symbols.patch" "../../libpng-apng.patch"
 patch -Np0 -i "../../libpng-apng.patch"
 patch -Np1 -i "../fix-cmake-policy.patch"
 cp scripts/pnglibconf.h.prebuilt pnglibconf.h
